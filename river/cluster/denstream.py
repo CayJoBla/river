@@ -384,7 +384,7 @@ class DenStream(base.Clusterer):
                     neighbor_neighbors = self._query_neighbor(seed_queue[0])
                     # add new neighbors to seed set
                     for neighbor_neighbor in neighbor_neighbors:
-                        if labels[neighbor_neighbor] is not None:
+                        if labels[neighbor_neighbor] is None:
                             seed_queue.append(neighbor_neighbor)
 
         self.n_clusters, self.clusters = self._generate_clusters_for_labels(labels)
