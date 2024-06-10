@@ -355,7 +355,7 @@ class DenStream(base.Clusterer):
         # implementation of the DBSCAN algorithm proposed by Ester et al.
         if not self.initialized:
             # The model is not ready
-            return 0
+            return -1
 
         # cluster counter; in this algorithm cluster labels start with 0
         c = -1
