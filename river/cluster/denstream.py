@@ -219,7 +219,7 @@ class DenStream(base.Clusterer):
                 if updated_omc.calc_weight(self.timestamp) > self.mu * self.beta:
                     # it has grown into a p-micro-cluster
                     del self.o_micro_clusters[closest_omc_key]
-                    self.p_micro_clusters[len(self.p_micro_clusters)] = updated_omc
+                    self.p_micro_clusters[max(self.p_micro_clusters.keys())+1] = updated_omc
                 else:
                     self.o_micro_clusters[closest_omc_key] = updated_omc
             else:
@@ -229,7 +229,7 @@ class DenStream(base.Clusterer):
                     timestamp=self.timestamp,
                     decaying_factor=self.decaying_factor,
                 )
-                self.o_micro_clusters[len(self.o_micro_clusters)] = mc_from_p
+                self.o_micro_clusters[max(self.o_micro_clusters.keys())+1] = mc_from_p
             merged_status = True
 
         # when p is not merged and o-micro-cluster set is empty
