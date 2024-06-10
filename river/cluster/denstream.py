@@ -185,8 +185,7 @@ class DenStream(base.Clusterer):
     def _distance(point_a, point_b):
         return utils.math.minkowski_distance(point_a, point_b, 2)
 
-    def _get_closest_cluster_key(self, point, clusters):
-        min_distance = math.inf
+    def _get_closest_cluster_key(self, point, clusters, min_distance=math.inf):
         key = -1
         for k, cluster in clusters.items():
             center = cluster.calc_center(self.timestamp)
@@ -389,7 +388,7 @@ class DenStream(base.Clusterer):
 
         self.n_clusters, self.clusters = self._generate_clusters_for_labels(labels)
 
-        return self._get_closest_cluster_key(x, self.clusters)
+        return self._get_closest_cluster_key(x, self.clusters, min_distance=self.epsilon)
 
 
 class DenStreamMicroCluster(metaclass=ABCMeta):
