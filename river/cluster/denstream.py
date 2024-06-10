@@ -302,7 +302,7 @@ class DenStream(base.Clusterer):
             if not item.covered:
                 item.covered = True
                 neighborhood = self._get_neighborhood_ids(item)
-                if len(neighborhood) > self.mu:
+                if len(neighborhood) > (self.beta * self.mu):
                     mc = DenStreamMicroCluster(
                         x=item.x,
                         timestamp=self.timestamp,
