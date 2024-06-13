@@ -149,7 +149,7 @@ class DenStream(base.Clusterer):
         stream_speed: int = 100,
     ):
         super().__init__()
-        self.timestamp = -1
+        self.timestamp = 0
         self.initialized = False
         self.decaying_factor = decaying_factor
         self.beta = beta
