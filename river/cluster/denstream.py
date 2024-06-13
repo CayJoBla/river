@@ -400,69 +400,77 @@ class DenStreamMicroCluster(metaclass=ABCMeta):
     """DenStream Micro-cluster class"""
 
     def __init__(self, x, timestamp, decaying_factor):
-        self.x = x
         self.last_edit_time = timestamp
         self.creation_time = timestamp
         self.decaying_factor = decaying_factor
 
-        self.N = 1
-        self.linear_sum = x
-        self.squared_sum = {i: (x_val * x_val) for i, x_val in x.items()}
+        self._cf1 = x
+        self._cf2 = {i: x_val**2 for i, x_val in x.items()}
+        self._w = 1
 
-    def calc_norm_cf1_cf2(self, fading_factor):
-        # |CF1| and |CF2| in the paper
-        sum_of_squares_cf1 = 0
-        sum_of_squares_cf2 = 0
-        for key in self.linear_sum.keys():
-            val_ls = self.linear_sum[key]
-            val_ss = self.squared_sum[key]
-            sum_of_squares_cf1 += fading_factor * val_ls * fading_factor * val_ls
-            sum_of_squares_cf2 += fading_factor * val_ss * fading_factor * val_ss
-        # return |CF1| and |CF2|
-        return math.sqrt(sum_of_squares_cf1), math.sqrt(sum_of_squares_cf2)
+    def _update(self, timestamp):
+        if self.last_edit_time == timestamp:
+            return
+        fading_factor = self.fading_function(timestamp - self.last_edit_time)
+        self._cf1 = {key: val * fading_factor for key, val in self._cf1.items()}
+        self._cf2 = {key: val * fading_factor for key, val in self._cf2.items()}
+        self._w *= fading_factor
+        self.last_edit_time = timestamp
 
     def calc_weight(self, timestamp):
-        return self._weight(self.fading_function(timestamp - self.last_edit_time))
-
-    def _weight(self, fading_factor):
-        return self.N * fading_factor
+        self._update(timestamp)
+        return self._w
 
     def calc_center(self, timestamp):
-        ff = self.fading_function(timestamp - self.last_edit_time)
-        weight = self._weight(ff)
-        center = {key: (ff * val) / weight for key, val in self.linear_sum.items()}
-        return center
+        self._update(timestamp)
+        return {key: val / self._w for key, val in self._cf1.items()}
 
     def calc_radius(self, timestamp):
-        ff = self.fading_function(timestamp - self.last_edit_time)
-        weight = self._weight(ff)
-        norm_cf1, norm_cf2 = self.calc_norm_cf1_cf2(ff)
-        diff = (norm_cf2 / weight) - ((norm_cf1 / weight) ** 2)
-        radius = math.sqrt(diff) if diff > 0 else 0
-        return radius
+        """NOTE: This forumla for the radius results in negative values, despite
+        being defined this way in the original paper. Likely, the authors meant
+        to compute a type of standard deviation, but the formula is incorrect.
+
+        Perhaps a better formula would be to compute the individual standard
+        deviations for each dimension and then compute the norm of the resuling
+        vector:
+            r = || sqrt( (CF2 / w) - (CF1 / w)^2 ) ||
+        """
+        self._update(timestamp)
+        norm_cf1 = math.sqrt(sum([val**2 for val in self._cf1.values()]))
+        norm_cf2 = math.sqrt(sum([val**2 for val in self._cf2.values()]))
+        diff = (norm_cf2 / self._w) - (norm_cf1 / self._w)**2
+        return math.sqrt(diff) if diff > 0 else 0
+
+    # def calc_radius(self, timestamp):
+    #     """NOTE: This forumla for the radius does not match the formula
+    #     presented in the original paper, due to the fact that the original
+    #     formula resulted in negative values for the radius. This formula is:
+    #         r = || sqrt( (CF2 / w) - (CF1 / w)^2 ) ||
+    #     """
+    #     self._update(timestamp)
+    #     diff = [(self._cf2[key] / self._w) - (self._cf1[key] / self._w)**2
+    #             for key in self._cf1.keys()]
+    #     summation = sum(diff)
+    #     try:
+    #         return math.sqrt(summation)
+    #     except:
+    #         print("Differences:", diff)
+    #         raise ValueError(f"Erroneous radius value: {summation}")
 
     def insert(self, x, timestamp):
-        self.N += 1
-        self.last_edit_time = timestamp
+        self._update(timestamp)
+        self._w += 1
         for key, val in x.items():
-            try:
-                self.linear_sum[key] += val
-                self.squared_sum[key] += val * val
-            except KeyError:
-                self.linear_sum[key] = val
-                self.squared_sum[key] = val * val
+            self._cf1[key] = self._cf1.get(key, 0) + val
+            self._cf2[key] = self._cf2.get(key, 0) + val**2
 
     def merge(self, cluster):
-        self.N += cluster.N
+        timestamp = max(self.last_edit_time, cluster.last_edit_time)
+        self._update(timestamp)
+        cluster._update(timestamp)
         for key in cluster.linear_sum.keys():
-            try:
-                self.linear_sum[key] += cluster.linear_sum[key]
-                self.squared_sum[key] += cluster.squared_sum[key]
-            except KeyError:
-                self.linear_sum[key] = cluster.linear_sum[key]
-                self.squared_sum[key] = cluster.squared_sum[key]
-        if self.last_edit_time < cluster.creation_time:
-            self.last_edit_time = cluster.creation_time
+            self._cf1[key] = self._cf1.get(key, 0) + cluster._cf1[key]
+            self._cf2[key] = self._cf2.get(key, 0) + cluster._cf2[key]
 
     def fading_function(self, time):
         return 2 ** (-self.decaying_factor * time)
