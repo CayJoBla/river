@@ -185,7 +185,8 @@ class DenStream(base.Clusterer):
     def _distance(point_a, point_b):
         return utils.math.minkowski_distance(point_a, point_b, 2)
 
-    def _get_closest_cluster_key(self, point, clusters, min_distance=math.inf):
+    def _get_closest_cluster_key(self, point, clusters, max_distance=math.inf):
+        min_distance = max_distance
         key = -1
         for k, cluster in clusters.items():
             center = cluster.calc_center(self.timestamp)
@@ -312,7 +313,45 @@ class DenStream(base.Clusterer):
                 else:
                     item.covered = False
 
+    def _recluser(self):
+        # This function handles the case when a clustering must be recomputed.
+        if self.clustering_is_up_to_date or not self.initialized:
+            return      # No need to recompute clusters
+
+        # cluster counter; in this algorithm cluster labels start with 0
+        c = -1
+        # initiate labels of p-micro-clusters to None
+        labels = {pmc: None for pmc in self.p_micro_clusters.values()}
+
+        for pmc in self.p_micro_clusters.values():
+            # previously processed in inner loop
+            if labels[pmc] is not None:
+                continue
+            # next cluster label
+            c += 1
+            labels[pmc] = c
+            # neighbors to expand
+            seed_queue = self._query_neighbor(pmc)
+            # process every point in seed set
+            while seed_queue:
+                # check previously proceeded points
+                if labels[seed_queue[0]] is not None:
+                    seed_queue.popleft()
+                    continue
+                if seed_queue:
+                    labels[seed_queue[0]] = c
+                    # find neighbors of neighbors
+                    neighbor_neighbors = self._query_neighbor(seed_queue[0])
+                    # add new neighbors to seed set
+                    for neighbor_neighbor in neighbor_neighbors:
+                        if labels[neighbor_neighbor] is None:
+                            seed_queue.append(neighbor_neighbor)
+
+        self.n_clusters, self.clusters = self._generate_clusters_for_labels(labels)
+        self.clustering_is_up_to_date = True
+
     def learn_one(self, x, w=None):
+        self.clustering_is_up_to_date = False       # TODO: Should the timestamp be updated before initialization ocurrs?
         self._n_samples_seen += 1
         # control the stream speed
         if self._n_samples_seen % self.stream_speed == 0:
@@ -353,42 +392,8 @@ class DenStream(base.Clusterer):
     def predict_one(self, x, w=None):
         # This function handles the case when a clustering request arrives.
         # implementation of the DBSCAN algorithm proposed by Ester et al.
-        if not self.initialized:
-            # The model is not ready
-            return -1
-
-        # cluster counter; in this algorithm cluster labels start with 0
-        c = -1
-        # initiate labels of p-micro-clusters to None
-        labels = {pmc: None for pmc in self.p_micro_clusters.values()}
-
-        for pmc in self.p_micro_clusters.values():
-            # previously processed in inner loop
-            if labels[pmc] is not None:
-                continue
-            # next cluster label
-            c += 1
-            labels[pmc] = c
-            # neighbors to expand
-            seed_queue = self._query_neighbor(pmc)
-            # process every point in seed set
-            while seed_queue:
-                # check previously proceeded points
-                if labels[seed_queue[0]] is not None:
-                    seed_queue.popleft()
-                    continue
-                if seed_queue:
-                    labels[seed_queue[0]] = c
-                    # find neighbors of neighbors
-                    neighbor_neighbors = self._query_neighbor(seed_queue[0])
-                    # add new neighbors to seed set
-                    for neighbor_neighbor in neighbor_neighbors:
-                        if labels[neighbor_neighbor] is None:
-                            seed_queue.append(neighbor_neighbor)
-
-        self.n_clusters, self.clusters = self._generate_clusters_for_labels(labels)
-
-        return self._get_closest_cluster_key(x, self.clusters, min_distance=self.epsilon)
+        self._recluser()
+        return self._get_closest_cluster_key(x, self.clusters, max_distance=self.epsilon)
 
 
 class DenStreamMicroCluster(metaclass=ABCMeta):
