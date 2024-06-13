@@ -249,10 +249,9 @@ class DenStream(base.Clusterer):
             c_p_center = c_p.calc_center(self.timestamp)
             c_q_center = c_q.calc_center(self.timestamp)
             distance = self._distance(c_p_center, c_q_center)
-            if distance < 2 * self.epsilon and distance <= c_p.calc_radius(
-                self.timestamp
-            ) + c_q.calc_radius(self.timestamp):
-                return True
+            if distance < 2 * self.epsilon:
+                if distance <= c_p.calc_radius(self.timestamp) + c_q.calc_radius(self.timestamp):
+                    return True
         return False
 
     def _query_neighbor(self, cluster):
@@ -316,7 +315,7 @@ class DenStream(base.Clusterer):
                 else:
                     item.covered = False
 
-    def _recluser(self):
+    def _recluster(self):
         # This function handles the case when a clustering must be recomputed.
         if self.clustering_is_up_to_date or not self.initialized:
             return      # No need to recompute clusters
@@ -395,7 +394,7 @@ class DenStream(base.Clusterer):
     def predict_one(self, x, w=None):
         # This function handles the case when a clustering request arrives.
         # implementation of the DBSCAN algorithm proposed by Ester et al.
-        self._recluser()
+        self._recluster()
         return self._get_closest_cluster_key(x, self.clusters, max_distance=self.epsilon)
 
 
