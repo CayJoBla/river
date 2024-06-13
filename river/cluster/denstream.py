@@ -203,7 +203,7 @@ class DenStream(base.Clusterer):
         if len(self.p_micro_clusters) != 0:
             # try to merge p into its nearest p-micro-cluster c_p
             closest_pmc_key = self._get_closest_cluster_key(point, self.p_micro_clusters)
-            updated_pmc = copy.copy(self.p_micro_clusters[closest_pmc_key])
+            updated_pmc = copy.deepcopy(self.p_micro_clusters[closest_pmc_key])
             updated_pmc.insert(point, self.timestamp)
             if updated_pmc.calc_radius(self.timestamp) <= self.epsilon:
                 # keep updated p-micro-cluster
@@ -212,7 +212,7 @@ class DenStream(base.Clusterer):
 
         if not merged_status and len(self.o_micro_clusters) != 0:
             closest_omc_key = self._get_closest_cluster_key(point, self.o_micro_clusters)
-            updated_omc = copy.copy(self.o_micro_clusters[closest_omc_key])
+            updated_omc = copy.deepcopy(self.o_micro_clusters[closest_omc_key])
             updated_omc.insert(point, self.timestamp)
             if updated_omc.calc_radius(self.timestamp) <= self.epsilon:
                 # keep updated o-micro-cluster
@@ -274,7 +274,7 @@ class DenStream(base.Clusterer):
         # generate set of clusters with the same label
         for label, micro_clusters in mcs_per_label.items():
             # merge clusters with the same label into a big cluster
-            cluster = copy.copy(micro_clusters[0])
+            cluster = copy.deepcopy(micro_clusters[0])
             for mc in range(1, len(micro_clusters)):
                 cluster.merge(micro_clusters[mc])
 
@@ -429,11 +429,6 @@ class DenStreamMicroCluster(metaclass=ABCMeta):
         """NOTE: This forumla for the radius results in negative values, despite
         being defined this way in the original paper. Likely, the authors meant
         to compute a type of standard deviation, but the formula is incorrect.
-
-        Perhaps a better formula would be to compute the individual standard
-        deviations for each dimension and then compute the norm of the resuling
-        vector:
-            r = || sqrt( (CF2 / w) - (CF1 / w)^2 ) ||
         """
         self._update(timestamp)
         norm_cf1 = math.sqrt(sum([val**2 for val in self._cf1.values()]))
