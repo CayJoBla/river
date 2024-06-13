@@ -219,7 +219,10 @@ class DenStream(base.Clusterer):
                 if updated_omc.calc_weight(self.timestamp) > self.mu * self.beta:
                     # it has grown into a p-micro-cluster
                     del self.o_micro_clusters[closest_omc_key]
-                    self.p_micro_clusters[max(self.p_micro_clusters.keys())+1] = updated_omc
+                    if len(self.p_micro_clusters) != 0:
+                        self.p_micro_clusters[max(self.p_micro_clusters.keys())+1] = updated_omc
+                    else:
+                        self.p_micro_clusters[0] = updated_omc
                 else:
                     self.o_micro_clusters[closest_omc_key] = updated_omc
             else:
